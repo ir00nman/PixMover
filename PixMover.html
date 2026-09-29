@@ -145,7 +145,10 @@ $('brush').oninput=e=>brushSize=+e.target.value;
 let speed=1;$('speed').oninput=e=>speed=parseFloat(e.target.value);
 let cellSize=17;
 $('resolution').oninput=e=>{cellSize=23-parseInt(e.target.value,10);if(live)liveInit(true);};
-
+/* 
+    Made by: ir00nman (https://github.com/ir00nman/PixMover)
+    Project: PixMover
+    Year: 2026 */
 let dirty=false,finalHarvest=false,harvestAll=false,trail=[],hover=null;
 const pt=(e,c)=>{const r=c.getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height};};
 function dot(p){drawCtx.fillStyle=brushColor;drawCtx.beginPath();drawCtx.arc(p.x,p.y,brushSize/2,0,Math.PI*2);drawCtx.fill();}
@@ -380,7 +383,10 @@ function liveFrame(now){
     if(tn){outCtx.font='700 14px Roboto,sans-serif';outCtx.lineWidth=4;outCtx.strokeStyle='#fff';outCtx.fillStyle='#e65100';
       const tx2=hover.x+R+6>W-90?hover.x-R-96:hover.x+R+6;outCtx.strokeText('авто-тон',tx2,hover.y+5);outCtx.fillText('авто-тон',tx2,hover.y+5);}}
   liveRaf=requestAnimationFrame(liveFrame);
-}
+} /* 
+    Made by: ir00nman (https://github.com/ir00nman/PixMover)
+    Project: PixMover
+    Year: 2026 */
 function setMode(m){
   if(m&&!targetReady){statusEl.textContent='Для Live сначала загрузите целевое фото.';return;}
   live=m;drawCtx=live?freshCtx:srcCtx;rec=null;trail=[];statusEl.classList.remove('warn','tone');toneUntil=0;$('curChip').classList.remove('boost');$('curTxt').textContent='цвет';$('outCard').classList.remove('tone');
