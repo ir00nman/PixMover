@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PixMover</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
+<style>
+:root{
+  --surface:#fef7ff;--container:#f3edf7;--high:#ece6f0;--primary:#6750a4;--on-primary:#fff;
+  --sec:#e8def8;--on-sec:#1d192b;--outline:#79747e;--outline-v:#cac4d0;--text:#1d1b20;--muted:#49454f;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --surface:#141218;--container:#211f26;--high:#2b2930;--primary:#d0bcff;--on-primary:#381e72;
+  --sec:#4a4458;--on-sec:#e8def8;--outline:#938f99;--outline-v:#49454f;--text:#e6e0e9;--muted:#cac4d0;}}
+:root[data-theme="dark"]{
+  --surface:#141218;--container:#211f26;--high:#2b2930;--primary:#d0bcff;--on-primary:#381e72;
+  --sec:#4a4458;--on-sec:#e8def8;--outline:#938f99;--outline-v:#49454f;--text:#e6e0e9;--muted:#cac4d0;}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--surface);color:var(--text);padding:24px 16px 48px;
+  font-family:Roboto,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:1040px;margin:0 auto}
+h1{font-size:28px;line-height:36px;font-weight:400;margin:0 0 8px}
+.sub{color:var(--muted);font-size:14px;line-height:20px;margin:0 0 24px;max-width:70ch}
+.stage{display:flex;gap:16px;flex-wrap:wrap;justify-content:center}
+.card{background:var(--container);border-radius:28px;padding:16px;flex:1 1 340px;max-width:560px}
+.card.hidden{display:none}
+.card h2{font-size:14px;font-weight:500;letter-spacing:.1px;color:var(--muted);margin:0 0 12px 8px}
+.box{width:100%;background:#fff;border-radius:16px;overflow:hidden;aspect-ratio:3/4}
+canvas{width:100%;height:100%;display:block;touch-action:none;cursor:crosshair}
+.controls{background:var(--container);border-radius:28px;padding:16px 20px;margin-top:16px;
+  display:flex;flex-wrap:wrap;gap:14px 20px;align-items:center}
+.sw{display:flex;gap:8px;align-items:center}
+.swatch{width:32px;height:32px;border-radius:50%;border:2px solid var(--outline-v);cursor:pointer;padding:0}
+.swatch.active{outline:3px solid var(--primary);outline-offset:2px}
+input[type=color]{width:32px;height:32px;border:none;border-radius:50%;padding:0;background:none;cursor:pointer}
+.grp{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+input[type=range]{accent-color:var(--primary);width:110px}
+button{font:inherit;font-size:14px;font-weight:500;letter-spacing:.1px;height:40px;padding:0 20px;
+  border-radius:20px;border:1px solid var(--outline);background:transparent;color:var(--primary);cursor:pointer;
+  position:relative;overflow:hidden}
+button:hover{background:color-mix(in srgb,var(--primary) 8%,transparent)}
+button.filled{background:var(--primary);color:var(--on-primary);border-color:var(--primary)}
+button.filled:hover{filter:brightness(1.08)}
+button.tonal{background:var(--sec);color:var(--on-sec);border-color:transparent}
+button:disabled{opacity:.38;cursor:default}
+button.swatch{height:32px;padding:0;border-radius:50%}
+.seg{display:inline-flex}
+.seg button{border-radius:0;height:40px;padding:0 18px}
+.seg button:first-child{border-radius:20px 0 0 20px}
+.seg button:last-child{border-radius:0 20px 20px 0;margin-left:-1px}
+.seg button.on{background:var(--sec);color:var(--on-sec)}
+.file input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.spacer{flex:1}
+.status.warn{color:#e8524a;font-weight:500}
+.chip{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 12px 0 6px;border-radius:16px;
+  border:1px solid var(--outline-v);font-size:13px;color:var(--muted);transition:all .25s}
+.chip i{width:20px;height:20px;border-radius:50%;border:2px solid var(--outline-v);display:block}
+.chip.boost{background:#ff9800;color:#1d1b20;border-color:#ff9800;font-weight:700;animation:pulse .9s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 6px rgba(255,152,0,.35)}}
+.card.tone{outline:3px solid #ff9800;outline-offset:-3px}
+.status.tone{color:#1d1b20;background:#ff9800;border-radius:12px;padding:6px 12px;font-weight:700}
+.status{font-size:13px;color:var(--muted);margin:12px 8px 0;min-height:18px}
+input[type=checkbox]{accent-color:var(--primary);width:18px;height:18px}
+@media (max-width:720px){.spacer{display:none}#morphBtn{width:100%}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>PixMover</h1>
+  <p class="sub">Рисуйте или загрузите фото — пиксели с небольшой задержкой перетекают в позиции целевой фотографии по ранговой яркости. В режиме Live рисуете на одном холсте: только что нарисованные пиксели отрываются от кисти и летят на свободные места целевого фото, а уже осевшие остаются на месте. Когда места для вашего тона заканчиваются, включается авто-тон: цвет кисти сам светлеет или темнеет.</p>
+
+  <div class="stage">
+    <div class="card" id="srcCard"><h2>Ваш рисунок / фото</h2><div class="box"><canvas id="src" width="486" height="648"></canvas></div></div>
+    <div class="card" id="outCard"><h2 id="outTitle">Результат</h2><div class="box"><canvas id="out" width="486" height="648"></canvas></div></div>
+  </div>
+
+  <div class="controls">
+    <div class="seg"><button id="modeNormal" class="on">Обычный</button><button id="modeLive">Live</button></div>
+    <div class="sw" id="swatches"></div>
+    <input type="color" id="customColor" value="#e08a3c" title="свой цвет">
+    <span class="chip" id="curChip"><i id="curDot"></i><span id="curTxt">цвет</span></span>
+    <label class="grp"><input type="checkbox" id="autoTone" checked> авто-тон</label>
+    <label class="grp">кисть <input type="range" id="brush" min="4" max="60" value="22"></label>
+    <label class="grp">скорость <input type="range" id="speed" min="0.25" max="3" step="0.25" value="1"></label>
+    <label class="grp">детализация <input type="range" id="resolution" min="3" max="20" step="1" value="6"></label>
+    <button id="clearBtn">Очистить</button>
+    <button id="gifBtn" class="tonal">Экспорт GIF</button>
+    <button class="tonal file">Загрузить исходник<input type="file" id="fileInput" accept="image/*"></button>
+    <button class="tonal file">Загрузить цель<input type="file" id="targetInput" accept="image/*"></button>
+    <span class="spacer"></span>
+    <button id="morphBtn" class="filled">Превратить →</button>
+  </div>
+  <div class="status" id="status"></div>
+</div>
+<img id="targetImg" style="display:none" alt="">
+
+<script>
+let W=486,H=648,live=false;
+const $=id=>document.getElementById(id);
+const srcCanvas=$('src'),outCanvas=$('out'),statusEl=$('status');
+const srcCtx=srcCanvas.getContext('2d',{willReadFrequently:true});
+const outCtx=outCanvas.getContext('2d');
+srcCtx.fillStyle='#fff';srcCtx.fillRect(0,0,W,H);
+const freshCanvas=document.createElement('canvas');freshCanvas.width=W;freshCanvas.height=H;
+const freshCtx=freshCanvas.getContext('2d',{willReadFrequently:true});
+let drawCtx=srcCtx;
+
+/* ---------- размер холста под пропорции ---------- */
+function setSize(w,h){
+  const old=document.createElement('canvas');old.width=srcCanvas.width;old.height=srcCanvas.height;
+  old.getContext('2d').drawImage(srcCanvas,0,0);
+  W=w;H=h;
+  srcCanvas.width=outCanvas.width=freshCanvas.width=W;srcCanvas.height=outCanvas.height=freshCanvas.height=H;
+  srcCtx.fillStyle='#fff';srcCtx.fillRect(0,0,W,H);srcCtx.drawImage(old,0,0,W,H);
+  outCtx.fillStyle='#fff';outCtx.fillRect(0,0,W,H);
+  document.querySelectorAll('.box').forEach(b=>b.style.aspectRatio=W+'/'+H);
+}
+function sizeFor(iw,ih){const k=700/Math.max(iw,ih);return[Math.max(50,Math.round(iw*k)),Math.max(50,Math.round(ih*k))];}
+
+/* ---------- кисть ---------- */
+let brushColor='#1c1c1c',brushSize=22,last=null;
+const colors=['#1c1c1c','#e6e6e6','#c0392b','#e08a3c','#e8c547','#4c8c5b','#3a7bd5','#7b4ca0'];
+colors.forEach((c,i)=>{
+  const b=document.createElement('button');b.className='swatch'+(i?'':' active');b.style.background=c;
+  b.onclick=()=>{brushColor=c;[...$('swatches').children].forEach(s=>s.classList.remove('active'));b.classList.add('active');updateChip();};
+  $('swatches').appendChild(b);
+});
+$('customColor').oninput=e=>{brushColor=e.target.value;[...$('swatches').children].forEach(s=>s.classList.remove('active'));updateChip();};
+let autoTone=true,toneUntil=0;
+$('autoTone').onchange=e=>autoTone=e.target.checked;
+function updateChip(){$('curDot').style.background=brushColor;}
+updateChip();
+const lumOf=(r,g,b)=>.299*r+.587*g+.114*b;
+const hex2rgb=h=>{const n=parseInt(h.replace('#',''),16);return[n>>16,(n>>8)&255,n&255];};
+const rgb2hex=(r,g,b)=>'#'+[r,g,b].map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('');
+function retone(r,g,b,t){ // меняем яркость, оттенок сохраняем
+  const l=lumOf(r,g,b);
+  if(t>l){const k=(t-l)/((255-l)||1);return[r+(255-r)*k,g+(255-g)*k,b+(255-b)*k];}
+  const f=l?t/l:0;return[r*f,g*f,b*f];
+}
+$('brush').oninput=e=>brushSize=+e.target.value;
+let speed=1;$('speed').oninput=e=>speed=parseFloat(e.target.value);
+let cellSize=17;
+$('resolution').oninput=e=>{cellSize=23-parseInt(e.target.value,10);if(live)liveInit(true);};
+
+let dirty=false,finalHarvest=false,harvestAll=false,trail=[],hover=null;
+const pt=(e,c)=>{const r=c.getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height};};
+function dot(p){drawCtx.fillStyle=brushColor;drawCtx.beginPath();drawCtx.arc(p.x,p.y,brushSize/2,0,Math.PI*2);drawCtx.fill();}
+function line(a,b){drawCtx.strokeStyle=brushColor;drawCtx.lineWidth=brushSize;drawCtx.lineCap='round';drawCtx.lineJoin='round';
+  drawCtx.beginPath();drawCtx.moveTo(a.x,a.y);drawCtx.lineTo(b.x,b.y);drawCtx.stroke();}
+[srcCanvas,outCanvas].forEach(c=>{
+  c.addEventListener('pointerdown',e=>{
+    if(c===outCanvas&&!live)return;
+    if(live&&locked)return;
+    c.setPointerCapture(e.pointerId);last=pt(e,c);dot(last);if(live)trail.push(last);dirty=true;e.preventDefault();
+  });
+  c.addEventListener('pointermove',e=>{
+    if(!last)return;
+    const evs=e.getCoalescedEvents?e.getCoalescedEvents():[e];
+    for(const ev of (evs.length?evs:[e])){const p=pt(ev,c);line(last,p);last=p;if(live)trail.push(p);}
+    dirty=true;e.preventDefault();
+  });
+  ['pointerup','pointercancel'].forEach(t=>c.addEventListener(t,()=>{if(last){last=null;finalHarvest=true;dirty=true;}}));
+  if(c===outCanvas){c.addEventListener('pointermove',e=>{hover=pt(e,c);});c.addEventListener('pointerleave',()=>{hover=null;});}
+});
+
+/* ---------- загрузка картинок ---------- */
+const targetImg=$('targetImg');let targetReady=false;
+$('fileInput').onchange=e=>{
+  const f=e.target.files[0];if(!f)return;
+  const img=new Image(),url=URL.createObjectURL(f);
+  img.onload=()=>{
+    const[w,h]=sizeFor(img.width,img.height);setSize(w,h);
+    srcCtx.drawImage(img,0,0,W,H);URL.revokeObjectURL(url);
+    statusEl.textContent='Фото загружено.';
+    if(live){liveInit();freshCtx.drawImage(img,0,0,W,H);dirty=finalHarvest=harvestAll=true;}
+  };
+  img.src=url;e.target.value='';
+};
+$('targetInput').onchange=e=>{
+  const f=e.target.files?.[0];if(!f)return;
+  const url=URL.createObjectURL(f);targetReady=false;
+  targetImg.onload=()=>{
+    targetReady=true;URL.revokeObjectURL(url);
+    const[w,h]=sizeFor(targetImg.naturalWidth,targetImg.naturalHeight);setSize(w,h);
+    statusEl.textContent='Портрет загружен.';
+    if(live)liveInit(true);
+  };
+  targetImg.onerror=()=>{URL.revokeObjectURL(url);statusEl.textContent='Не удалось загрузить цель.';};
+  targetImg.src=url;e.target.value='';
+};
+
+/* ---------- ячейки ---------- */
+function computeCells(ctx,cell,cols,rows){
+  const d=ctx.getImageData(0,0,W,H).data,N=cols*rows;
+  const R=new Float32Array(N),G=new Float32Array(N),B=new Float32Array(N),L=new Float32Array(N);
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+    let rr=0,gg=0,bb=0;
+    for(let y=r*cell;y<r*cell+cell;y++)for(let x=c*cell;x<c*cell+cell;x++){const i=(y*W+x)*4;rr+=d[i];gg+=d[i+1];bb+=d[i+2];}
+    const n=cell*cell,k=r*cols+c;R[k]=rr/n;G[k]=gg/n;B[k]=bb/n;L[k]=.299*R[k]+.587*G[k]+.114*B[k];
+  }
+  return{R,G,B,L};
+}
+function targetCells(cell,cols,rows){
+  const t=document.createElement('canvas');t.width=W;t.height=H;
+  const x=t.getContext('2d',{willReadFrequently:true});x.drawImage(targetImg,0,0,W,H);
+  return computeCells(x,cell,cols,rows);
+}
+const order=(L,N)=>Array.from({length:N},(_,i)=>i).sort((a,b)=>L[a]-L[b]);
+const ease=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+
+/* ---------- обычный режим ---------- */
+let animId=null,busy=false;
+function buildPlan(){
+  const cell=cellSize,cols=Math.floor(W/cell),rows=Math.floor(H/cell),N=cols*rows;
+  const S=computeCells(srcCtx,cell,cols,rows),T=targetCells(cell,cols,rows);
+  const so=order(S.L,N),to=order(T.L,N);
+  const sx=new Float32Array(N),sy=new Float32Array(N),ex=new Float32Array(N),ey=new Float32Array(N),st=new Array(N);
+  for(let k=0;k<N;k++){const i=so[k],j=to[k];
+    sx[i]=(i%cols)*cell;sy[i]=Math.floor(i/cols)*cell;ex[i]=(j%cols)*cell;ey[i]=Math.floor(j/cols)*cell;
+    st[i]=`rgb(${Math.round(S.R[i])},${Math.round(S.G[i])},${Math.round(S.B[i])})`;}
+  const dl=new Float32Array(N),cx=W/2,cy=H/2,md=Math.hypot(cx,cy);
+  for(let i=0;i<N;i++)dl[i]=.65*Math.hypot(sx[i]+cell/2-cx,sy[i]+cell/2-cy)/md+.35*Math.random();
+  return{N,cell,sx,sy,ex,ey,st,dl};
+}
+const HOLD=.15,STAG=.35; // задержка старта и «волна» разлёта в обычном режиме
+function drawPlan(ctx,p,t,s){
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height);
+  const c=Math.ceil(p.cell*s);
+  const len=1-HOLD-STAG;
+  for(let i=0;i<p.N;i++){ctx.fillStyle=p.st[i];
+    let u=(t-HOLD-STAG*p.dl[i])/len;u=u<0?0:u>1?1:u;const e=ease(u);
+    ctx.fillRect(Math.round((p.sx[i]+(p.ex[i]-p.sx[i])*e)*s),Math.round((p.sy[i]+(p.ey[i]-p.sy[i])*e)*s),c,c);}
+}
+$('morphBtn').onclick=()=>{
+  if(!targetReady){statusEl.textContent='Сначала загрузите целевое фото.';return;}
+  if(busy)return;
+  cancelAnimationFrame(animId);$('morphBtn').disabled=true;
+  const p=buildPlan(),dur=3000/speed,t0=performance.now();statusEl.textContent='Перетягиваю пиксели…';
+  (function frame(now){
+    const raw=Math.min(1,(now-t0)/dur);drawPlan(outCtx,p,raw,1);
+    if(raw<1)animId=requestAnimationFrame(frame);else{$('morphBtn').disabled=false;statusEl.textContent='Готово.';}
+  })(performance.now());
+};
+
+/* ---------- Live: перетекают только свежие пиксели ---------- */
+let Lv=null,liveRaf=null,lastHarvest=0,rec=null;
+const fnd=(a,x)=>{let r=x;while(a[r]!==r)r=a[r];while(a[x]!==r){const n=a[x];a[x]=r;x=n;}return r;};
+const liveCell=()=>Math.max(3,Math.round(cellSize*.6)); // в live детализация выше
+function liveInit(){
+  if(!targetReady)return;
+  const cell=liveCell(),cols=Math.floor(W/cell),rows=Math.floor(H/cell),N=cols*rows;
+  const T=targetCells(cell,cols,rows),ord=order(T.L,N),sl=Float32Array.from(ord,j=>T.L[j]);
+  trail=[];locked=false;outCanvas.style.cursor='';
+  Lv={cell,cols,rows,N,ord,sl,n:0,full:false,dir:0,
+    nf:Int32Array.from({length:N+1},(_,i)=>i),pfa:Int32Array.from({length:N+1},(_,i)=>i),
+    px:new Float32Array(N),py:new Float32Array(N),vx:new Float32Array(N),vy:new Float32Array(N),
+    tx:new Float32Array(N),ty:new Float32Array(N),rnd:Float32Array.from({length:N},()=>.6+Math.random()*.8),sty:new Array(N),t0:new Float64Array(N)};
+}
+function say(t,warn,tone){statusEl.textContent=t;statusEl.classList.toggle('warn',!!warn);statusEl.classList.toggle('tone',!!tone);}
+const HR=()=>brushSize*.75+(Lv?Lv.cell:cellSize)+6; // распределитель заметно шире кисти
+const LIVE_HOLD=1200,LIVE_JIT=700; // задержка в live (мс), больше чем в обычном
+function findSlot(l){ // ближайший по яркости свободный слот; -1 = всё занято
+  const{sl,N,nf,pfa}=Lv;
+  let lo=0,hi=N;while(lo<hi){const m=(lo+hi)>>1;if(sl[m]<l)lo=m+1;else hi=m;}
+  let ub=lo,h2=N;while(ub<h2){const m=(ub+h2)>>1;if(sl[m]<=l)ub=m+1;else h2=m;}
+  const idx=ub>lo?lo+Math.floor(Math.random()*(ub-lo)):Math.min(lo,N-1);
+  const a=fnd(nf,idx),b=fnd(pfa,idx+1)-1;
+  if(a>=N&&b<0)return -1;
+  if(a>=N)return b;if(b<0)return a;
+  return Math.abs(sl[a]-l)<Math.abs(sl[b]-l)?a:b;
+}
+function useSlot(p){Lv.nf[p]=p+1;Lv.pfa[p+1]=p;}
+function bestTone(from,dir){ // яркость, около которой ещё много свободных мест
+  const{sl,N,nf}=Lv,h=new Float32Array(256);
+  for(let p=0;p<N;p++)if(nf[p]===p)h[Math.min(255,Math.round(sl[p]))]++;
+  const c=new Float32Array(256);let mx=0;
+  for(let i=0;i<256;i++){let t=0;for(let j=Math.max(0,i-8);j<=Math.min(255,i+8);j++)t+=h[j];c[i]=t;if(t>mx)mx=t;}
+  const need=Math.max(3,mx*.25);let best=-1,bd=1e9;
+  for(let i=0;i<256;i++)if(c[i]>=need&&(dir===0||(i-from)*dir>0)){const d=Math.abs(i-from);if(d<bd){bd=d;best=i;}}
+  return best;
+}
+function tonePulse(dir,lum){ // авто-тон: двигаем цвет кисти и громко сообщаем
+  let [r,g,b]=hex2rgb(brushColor);const from=lumOf(r,g,b);
+  let t=bestTone(from,dir);if(t<0)t=bestTone(from,0);if(t<0)t=lum;
+  [r,g,b]=retone(r,g,b,t);brushColor=rgb2hex(r,g,b);
+  $('customColor').value=brushColor;[...$('swatches').children].forEach(s=>s.classList.remove('active'));updateChip();
+  toneUntil=performance.now()+3500;
+  const lt=dir>0?'светлее ▲':'темнее ▼';
+  $('curChip').classList.add('boost');$('curTxt').textContent='авто-тон: '+lt;$('outCard').classList.add('tone');
+  say('АВТО-ТОН ВКЛЮЧЁН: этот тон в цели закончился, кисть стала '+lt+'.',false,true);
+}
+let pend=null,lastSweep=0,locked=false;
+function lockDrawing(){locked=true;last=null;trail=[];hover=null;dirty=false;freshCtx.clearRect(0,0,W,H);outCanvas.style.cursor='not-allowed';}
+function harvest(fin,all,sweep){
+  const{cell,cols,rows,N,ord,sl}=Lv,R=HR(),R2=R*R,now=performance.now();
+  if(!all&&!sweep&&!trail.length)return;
+  let c0=0,c1=cols-1,r0=0,r1=rows-1;
+  if(!all){
+    let xa=1e9,ya=1e9,xb=-1e9,yb=-1e9;
+    for(const q of trail){xa=Math.min(xa,q.x);xb=Math.max(xb,q.x);ya=Math.min(ya,q.y);yb=Math.max(yb,q.y);}
+    if(trail.length){pend=pend?{xa:Math.min(pend.xa,xa),xb:Math.max(pend.xb,xb),ya:Math.min(pend.ya,ya),yb:Math.max(pend.yb,yb)}:{xa,xb,ya,yb};}
+    if(sweep){if(!pend)return;({xa,xb,ya,yb}=pend);}
+    c0=Math.max(0,Math.floor((xa-R)/cell));c1=Math.min(cols-1,Math.floor((xb+R)/cell));
+    r0=Math.max(0,Math.floor((ya-R)/cell));r1=Math.min(rows-1,Math.floor((yb+R)/cell));
+  }
+  const inCircle=(cx,cy)=>{
+    for(let i=0;i<trail.length;i++){
+      const a=trail[i],b=trail[i+1]||a,dx=b.x-a.x,dy=b.y-a.y,l2=dx*dx+dy*dy;
+      let t=l2?((cx-a.x)*dx+(cy-a.y)*dy)/l2:0;t=t<0?0:t>1?1:t;
+      const ex=a.x+dx*t-cx,ey=a.y+dy*t-cy;if(ex*ex+ey*ey<=R2)return true;
+    }return false;
+  };
+  const d=freshCtx.getImageData(0,0,W,H).data,thr=sweep?.12:(fin?.04:.5),area=cell*cell*255,tol=all?1e9:(autoTone?18:28);
+  let refused=0,taken=0,full=false,toned=0,tLum=0;
+  for(let r=r0;r<=r1;r++)for(let c=c0;c<=c1;c++){
+    if(sweep){if(last&&Math.hypot(c*cell+cell/2-last.x,r*cell+cell/2-last.y)<R+cell*2)continue;}
+    else if(!all&&!inCircle(c*cell+cell/2,r*cell+cell/2))continue;
+    let a=0,rr=0,gg=0,bb=0;
+    for(let y=r*cell;y<r*cell+cell;y++)for(let x=c*cell;x<c*cell+cell;x++){
+      const i=(y*W+x)*4,al=d[i+3];if(al){a+=al;rr+=d[i]*al;gg+=d[i+1]*al;bb+=d[i+2]*al;}}
+    if(!a)continue;
+    const cov=a/area;
+    if(cov>=thr){
+      if(Lv.n>=N){full=true;continue;}
+      rr/=a;gg/=a;bb/=a;
+      const lum=lumOf(rr,gg,bb),p=findSlot(lum);
+      if(p<0){full=true;continue;}
+      const dl=sl[p]-lum;
+      if(Math.abs(dl)>tol){
+        if(!autoTone){Lv.dir=dl>0?1:-1;refused++;continue;}
+        [rr,gg,bb]=retone(rr,gg,bb,sl[p]);toned=dl>0?1:-1;tLum=sl[p];
+      }
+      useSlot(p);
+      const k=Lv.n++,j=ord[p];
+      Lv.t0[k]=now+(LIVE_HOLD+Math.random()*LIVE_JIT+(all?(c/cols+r/rows)*600:0))/speed;
+      Lv.px[k]=c*cell;Lv.py[k]=r*cell;Lv.tx[k]=(j%cols)*cell;Lv.ty[k]=Math.floor(j/cols)*cell;
+      Lv.sty[k]=`rgb(${Math.round(rr)},${Math.round(gg)},${Math.round(bb)})`;
+      freshCtx.clearRect(c*cell,r*cell,cell,cell);taken++;
+    }else if(fin||sweep)freshCtx.clearRect(c*cell,r*cell,cell,cell);
+  }
+  if(sweep){if(fin)pend=null;}else trail=(last!==null&&trail.length)?[trail[trail.length-1]]:[];
+  if(toned&&!full)tonePulse(toned,tLum);
+  if(full||Lv.n>=N){lockDrawing();say('Портрет полностью заполнен — рисование остановлено. Нажмите «Очистить», чтобы начать заново.',true);}
+  else if(full){}
+  else if(refused)say('Распределение остановилось: места для этого тона в целевом фото закончились. Возьмите другой цвет ('+(Lv.dir>0?'посветлее':'потемнее')+').',true);
+  else if(taken&&statusEl.classList.contains('warn'))say('Live: рисуете — свежие пиксели улетают в целевое фото.',false);
+}
+function liveFrame(now){
+  if(!live)return;
+  if(dirty&&now-lastHarvest>60){
+    lastHarvest=now;const fin=finalHarvest&&last===null;if(fin)finalHarvest=false;
+    dirty=false;harvest(fin,harvestAll);harvestAll=false;
+    if(fin||(pend&&now-lastSweep>500)){lastSweep=now;harvest(fin,false,true);}
+  }
+  if(toneUntil&&now>toneUntil){toneUntil=0;$('curChip').classList.remove('boost');$('curTxt').textContent='цвет';$('outCard').classList.remove('tone');
+    if(statusEl.classList.contains('tone'))say('Live: рисуете — свежие пиксели улетают в целевое фото.',false);}
+  const{n,cell,cols,rows,px,py,vx,vy,tx,ty,rnd,sty,t0}=Lv,k0=.014*speed;
+  outCtx.fillStyle='#fff';outCtx.fillRect(0,0,W,H);
+  for(let i=0;i<n;i++){
+    if(now<t0[i]){outCtx.fillStyle=sty[i];outCtx.fillRect(px[i],py[i],cell,cell);continue;}
+    const k=k0*rnd[i];
+    vx[i]=(vx[i]+(tx[i]-px[i])*k)*.86;vy[i]=(vy[i]+(ty[i]-py[i])*k)*.86;
+    px[i]+=vx[i]*speed;py[i]+=vy[i]*speed;
+    outCtx.fillStyle=sty[i];outCtx.fillRect(px[i],py[i],cell,cell);
+  }
+  outCtx.drawImage(freshCanvas,0,0,cols*cell,rows*cell,0,0,cols*cell,rows*cell);
+  if(rec&&now-rec.t>60){
+    rec.t=now;rec.ctx.drawImage(outCanvas,0,0,rec.w,rec.h);rec.frames.push(rec.ctx.getImageData(0,0,rec.w,rec.h));
+    if(!statusEl.classList.contains('warn'))statusEl.textContent='Запись: '+rec.frames.length+' кадров';
+    if(rec.frames.length>=150)finishRec();
+  }
+  if(hover){const R=HR(),tn=toneUntil>0;outCtx.beginPath();outCtx.arc(hover.x,hover.y,R,0,Math.PI*2);
+    outCtx.lineWidth=3;outCtx.strokeStyle='rgba(255,255,255,.9)';outCtx.stroke();
+    outCtx.lineWidth=tn?3.5:1.5;outCtx.strokeStyle=tn?'#ff9800':'#6750a4';outCtx.stroke();
+    outCtx.beginPath();outCtx.arc(hover.x,hover.y,brushSize/2,0,Math.PI*2);outCtx.lineWidth=1;outCtx.strokeStyle='rgba(0,0,0,.45)';outCtx.stroke();
+    if(tn){outCtx.font='700 14px Roboto,sans-serif';outCtx.lineWidth=4;outCtx.strokeStyle='#fff';outCtx.fillStyle='#e65100';
+      const tx2=hover.x+R+6>W-90?hover.x-R-96:hover.x+R+6;outCtx.strokeText('авто-тон',tx2,hover.y+5);outCtx.fillText('авто-тон',tx2,hover.y+5);}}
+  liveRaf=requestAnimationFrame(liveFrame);
+}
+function setMode(m){
+  if(m&&!targetReady){statusEl.textContent='Для Live сначала загрузите целевое фото.';return;}
+  live=m;drawCtx=live?freshCtx:srcCtx;rec=null;trail=[];statusEl.classList.remove('warn','tone');toneUntil=0;$('curChip').classList.remove('boost');$('curTxt').textContent='цвет';$('outCard').classList.remove('tone');
+  cancelAnimationFrame(animId);cancelAnimationFrame(liveRaf);$('morphBtn').disabled=false;
+  $('modeLive').classList.toggle('on',live);$('modeNormal').classList.toggle('on',!live);
+  $('srcCard').classList.toggle('hidden',live);
+  $('morphBtn').style.display=live?'none':'';
+  $('gifBtn').textContent=live?'Записать GIF':'Экспорт GIF';
+  $('outTitle').textContent=live?'Live — рисуйте прямо здесь':'Результат';
+  outCtx.fillStyle='#fff';outCtx.fillRect(0,0,W,H);
+  if(live){freshCtx.clearRect(0,0,W,H);liveInit();liveRaf=requestAnimationFrame(liveFrame);statusEl.textContent='Live: рисуйте — свежие пиксели улетают в целевое фото.';}
+  else statusEl.textContent='';
+}
+$('modeLive').onclick=()=>setMode(true);
+$('modeNormal').onclick=()=>setMode(false);
+$('clearBtn').onclick=()=>{
+  if(live){freshCtx.clearRect(0,0,W,H);liveInit();say('',false);}
+  else{srcCtx.fillStyle='#fff';srcCtx.fillRect(0,0,W,H);outCtx.fillStyle='#fff';outCtx.fillRect(0,0,W,H);statusEl.textContent='';}
+};
+
+/* ---------- GIF ---------- */
+function quant(frames){
+  const tot=frames.length*frames[0].data.length/4,step=Math.max(1,Math.floor(tot/40000)),set=new Set();
+  for(const f of frames){const d=f.data;for(let i=0;i<d.length;i+=4*step)set.add((d[i]<<16)|(d[i+1]<<8)|d[i+2]);}
+  let boxes=[[...set]];
+  while(boxes.length<255){
+    let bi=0;for(let k=1;k<boxes.length;k++)if(boxes[k].length>boxes[bi].length)bi=k;
+    const b=boxes[bi];if(b.length<2)break;
+    const mn=[255,255,255],mx=[0,0,0];
+    for(const v of b)for(let c=0;c<3;c++){const x=(v>>(16-8*c))&255;if(x<mn[c])mn[c]=x;if(x>mx[c])mx[c]=x;}
+    let ch=0;for(let c=1;c<3;c++)if(mx[c]-mn[c]>mx[ch]-mn[ch])ch=c;
+    const sh=16-8*ch;b.sort((x,y)=>((x>>sh)&255)-((y>>sh)&255));
+    const h=b.length>>1;boxes.splice(bi,1,b.slice(0,h),b.slice(h));
+  }
+  const pal=new Uint8Array(768).fill(255);
+  boxes.forEach((b,k)=>{let r=0,g=0,bl=0;for(const v of b){r+=v>>16;g+=(v>>8)&255;bl+=v&255;}
+    pal[(k+1)*3]=r/b.length;pal[(k+1)*3+1]=g/b.length;pal[(k+1)*3+2]=bl/b.length;});
+  return pal;
+}
+function lzw(idx){
+  const out=[];let acc=0,nb=0,size=9,next=258,dict=new Map();
+  const emit=c=>{acc|=c<<nb;nb+=size;while(nb>=8){out.push(acc&255);acc>>=8;nb-=8;}};
+  emit(256);let pre=idx[0];
+  for(let i=1;i<idx.length;i++){
+    const k=idx[i],key=(pre<<8)|k,c=dict.get(key);
+    if(c!==undefined){pre=c;continue;}
+    emit(pre);
+    if(next===4096){emit(256);dict.clear();next=258;size=9;}
+    else{if(next>=(1<<size))size++;dict.set(key,next++);}
+    pre=k;
+  }
+  emit(pre);emit(257);if(nb>0)out.push(acc&255);
+  return out;
+}
+function encodeGif(frames,w,h,delays){
+  const pal=quant(frames),o=[],u16=v=>o.push(v&255,(v>>8)&255);
+  for(const ch of 'GIF89a')o.push(ch.charCodeAt(0));
+  u16(w);u16(h);o.push(0xF7,0,0);for(let i=0;i<768;i++)o.push(pal[i]);
+  o.push(0x21,0xFF,11);for(const ch of 'NETSCAPE2.0')o.push(ch.charCodeAt(0));o.push(3,1,0,0,0);
+  const cache=new Map(),n=255;
+  const near=(r,g,b)=>{let best=0,bd=1e9;for(let k=0;k<=n;k++){const dr=pal[k*3]-r,dg=pal[k*3+1]-g,db=pal[k*3+2]-b,d=dr*dr+dg*dg+db*db;if(d<bd){bd=d;best=k;}}return best;};
+  frames.forEach((f,fi)=>{
+    const d=f.data,idx=new Uint8Array(w*h);
+    for(let i=0;i<w*h;i++){const r=d[i*4],g=d[i*4+1],b=d[i*4+2],key=(r<<16)|(g<<8)|b;
+      let v=cache.get(key);if(v===undefined){v=near(r,g,b);cache.set(key,v);}idx[i]=v;}
+    o.push(0x21,0xF9,4,0x04);u16(delays[fi]);o.push(0,0,0x2C);u16(0);u16(0);u16(w);u16(h);o.push(0,8);
+    const data=lzw(idx);
+    for(let i=0;i<data.length;i+=255){const len=Math.min(255,data.length-i);o.push(len);for(let j=0;j<len;j++)o.push(data[i+j]);}
+    o.push(0);
+  });
+  o.push(0x3B);return new Uint8Array(o);
+}
+async function saveGif(bytes){
+  const blob=new Blob([bytes],{type:'image/gif'}),name='chekushizator.gif';
+  try{
+    const dl=window.claude?await window.claude.use('downloads'):null;
+    if(dl){await dl.save({filename:name,data:blob});statusEl.textContent='GIF сохранён ('+Math.round(bytes.length/1024)+' КБ).';return;}
+  }catch(e){statusEl.textContent=e&&e.code==='declined'?'Сохранение отменено.':'Не удалось сохранить GIF.';return;}
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();
+  statusEl.textContent='GIF готов ('+Math.round(bytes.length/1024)+' КБ).';
+}
+const gifScale=()=>Math.min(1,420/Math.max(W,H));
+async function finishRec(){
+  const r=rec;rec=null;$('gifBtn').textContent='Записать GIF';if(!r||!r.frames.length)return;
+  statusEl.textContent='Кодирую GIF…';await new Promise(f=>setTimeout(f,30));
+  await saveGif(encodeGif(r.frames,r.w,r.h,r.frames.map((_,i)=>i===r.frames.length-1?150:6)));
+}
+$('gifBtn').onclick=async()=>{
+  if(live){
+    if(rec){finishRec();return;}
+    const s=gifScale(),c=document.createElement('canvas');c.width=Math.round(W*s);c.height=Math.round(H*s);
+    rec={frames:[],t:0,w:c.width,h:c.height,ctx:c.getContext('2d',{willReadFrequently:true})};
+    $('gifBtn').textContent='Стоп и сохранить';return;
+  }
+  if(!targetReady){statusEl.textContent='Сначала загрузите целевое фото.';return;}
+  if(busy)return;busy=true;$('gifBtn').disabled=true;
+  try{
+    const p=buildPlan(),s=gifScale(),w=Math.round(W*s),h=Math.round(H*s);
+    const c=document.createElement('canvas');c.width=w;c.height=h;const ctx=c.getContext('2d',{willReadFrequently:true});
+    const F=Math.max(18,Math.round(48/speed)),frames=[],delays=[];
+    for(let f=0;f<=F;f++){
+      drawPlan(ctx,p,f/F,s);frames.push(ctx.getImageData(0,0,w,h));delays.push(f===0?60:f===F?200:6);
+      statusEl.textContent='Рендерю кадры '+(f+1)+'/'+(F+1)+'…';await new Promise(r=>setTimeout(r,0));
+    }
+    statusEl.textContent='Кодирую GIF…';await new Promise(r=>setTimeout(r,30));
+    await saveGif(encodeGif(frames,w,h,delays));
+  }finally{busy=false;$('gifBtn').disabled=false;}
+};
+</script>
+</body>
+</html>
